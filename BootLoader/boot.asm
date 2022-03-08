@@ -13,7 +13,8 @@ sector_num_of_FAT12_start equ 1
 sector_balance equ 17
 
 
-	jmp short _start
+;	jmp short _start
+	jmp _start
 	nop
 ;;; initialize FAT12 
 	BS_OEMName			db 'my_boot'
@@ -107,8 +108,60 @@ searching_different:
 goto_next_sector_in_root_dir:
 	add word[sector_No],1
 	jmp search_in_root_dir_begin
-no_loaderbin:
 
+;;; display on screen ERROR: No loader.bin found
+no_loaderbin:
+	mov ax,1301h
+	mov bx,008ch ; foreground red & shining
+	mov dx,0100h
+	mov cx,26
+	push ax
+	mov ax,ds
+	mov es,ax
+	pop ax
+	mov bp,no_loaderbin_message
+	int 10h
+	jmp $
+
+
+;;; get FAT12 Entry
+get_FAT_entry:
+	push es
+	push bx
+	push ax
+	mov ax,00
+	mov es,ax
+	pop ax
+	mov byte[odd],0
+	mov bx,3
+	mul bx
+	mov bx,2
+	div bx
+	cmp dx,0
+	jz _even
+	mov byte[odd],1
+_even:
+	xor dx,dx
+	mov bx,[BPB_BytesPerSec]
+	div bx
+	push dx
+	mov bx,8000h
+	add ax,sector_num_of_FAT12_start
+	mov cl,2
+	call func_read_one_sector
+
+	pop dx
+	add bx,dx
+	mov ax,[es:bx]
+	cmp byte[odd],1
+	jnz _even_2
+	shr ax,4
+_even_2:
+	and ax,0fffh
+	pop bx
+	pop es
+	ret
+	;;;cUR
 
 _start:
 	mov ax,cs
@@ -143,6 +196,9 @@ _start:
 	xor dl,dl 
 	int 13h
 	jmp $ ;dead loop
+
+no_loaderbin_message: 
+	db "ERROR: No loader.bin found" ;length 26
 
 boot_display_message: 
 	db "start boot..."

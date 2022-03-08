@@ -1,9 +1,7 @@
-
-
 #compile asm
 Write-Output "Start compiling asm..."
-nasm boot.asm -o boot.bin;
-
+nasm boot.asm -o boot.bin 
+#> ..\log\nasm.log
 
 #write into floppy
 Write-Output "Start write boot.bin to floppy..." 
