@@ -12,6 +12,11 @@ sector_num_of_root_dir_start equ 19
 sector_num_of_FAT12_start equ 1
 sector_balance equ 17
 
+;;; tmp var
+root_dir_size_for_loop dw root_dir_sectors
+sector_No dw 0
+odd db 0
+
 
 ;	jmp short _start
 	jmp _start
@@ -90,7 +95,7 @@ search_for_loaderbin:
 	mov cx,0bh
 cmp_file_name:
 	cmp cx,0
-	jz file_name_found
+	jz _file_name_found
 	dec cx
 	lodsb
 	cmp al,byte[es:di]
@@ -125,7 +130,8 @@ no_loaderbin:
 
 
 ;;; get FAT12 Entry
-get_FAT_entry:
+func_get_FAT_entry:
+;根据当前FAT表项引出下一个FAT表项
 	push es
 	push bx
 	push ax
@@ -161,6 +167,48 @@ _even_2:
 	pop bx
 	pop es
 	ret
+
+;;; found loader.bin name in root director struct
+_file_name_found:
+	mov ax,root_dir_sectors
+	and di,0ffe0h
+	add di,01ah
+	mov cx,word[es:di]
+	push cx
+	add cx,ax
+	add cx,sector_balance
+	mov ax,loader_base
+	mov es,ax
+	mov bx,loader_offset
+	mov ax,cx
+
+_go_on_loading_file:
+	push ax
+	push bx
+	mov ah,0eh
+	mov al,'.'
+	mov bl,0fh
+	int 10h
+	pop bx
+	pop ax
+
+	mov cl,1
+	call func_read_one_sector
+	pop ax
+	call func_get_FAT_entry
+	;current sector is the final one
+	cmp ax,0fffh
+	jz _file_loaded
+	push ax
+	mov dx,root_dir_sectors
+	add ax,dx
+	add ax,sector_balance
+	add bx,[BPB_BytesPerSec]
+	jmp _go_on_loading_file
+
+;jump to loader.bin from boot
+_file_loaded:
+	jmp loader_base:loader_offset
 	;;;cUR
 
 _start:
@@ -197,10 +245,13 @@ _start:
 	int 13h
 	jmp $ ;dead loop
 
+;;; display message 
+loader_file_name:
+	db "LOADER  BIN",0
 no_loaderbin_message: 
 	db "ERROR: No loader.bin found" ;length 26
-
 boot_display_message: 
 	db "start boot..."
+
 	times 510-($-$$)  db  0
 	dw 0xaa55
